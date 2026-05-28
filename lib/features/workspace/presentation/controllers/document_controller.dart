@@ -36,7 +36,7 @@ class DocumentController extends StateNotifier<AsyncValue<List<DocumentModel>>> 
     final currentDocs = state.value ?? [];
     try {
       final newDoc = await _repo.createDocument(wsId, title, content);
-      
+
       // Update UI immediately (optimistic update)
       if (_activeWorkspaceId == wsId) {
         state = AsyncValue.data([...currentDocs, newDoc]);
@@ -63,7 +63,7 @@ class DocumentController extends StateNotifier<AsyncValue<List<DocumentModel>>> 
     // 2. Persist in background repository
     try {
       await _repo.updateDocument(updatedDoc);
-      
+
       // If synced successfully from background, we might refresh state to reflect latest timestamps
       // but keeping optimistic state preserves seamless editing experience.
     } catch (e) {
@@ -79,6 +79,9 @@ final documentControllerProvider = StateNotifierProvider<DocumentController, Asy
   final repo = ref.watch(workspaceRepositoryProvider);
   return DocumentController(repo);
 });
+
+/// Exposes the active selected document inside a workspace
+final activeDocumentProvider = StateProvider<DocumentModel?>((ref) => null);
 
 /// Exposes the active synchronization pending items count
 final pendingSyncCountProvider = StreamProvider<int>((ref) {

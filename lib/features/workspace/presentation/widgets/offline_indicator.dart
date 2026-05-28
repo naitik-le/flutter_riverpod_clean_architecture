@@ -36,9 +36,7 @@ class OfflineIndicator extends ConsumerWidget {
           pillColor = AppColors.warning.withOpacity(0.15);
           textColor = AppColors.warning;
           icon = Icons.cloud_off_rounded;
-          message = pendingCount > 0 
-              ? 'Working Offline ($pendingCount changes cached)' 
-              : 'Working Offline';
+          message = pendingCount > 0 ? 'Working Offline ($pendingCount changes cached)' : 'Working Offline';
           showLoader = false;
         } else {
           // Online but syncing pending offline queue
@@ -53,18 +51,10 @@ class OfflineIndicator extends ConsumerWidget {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Color.lerp(Colors.black, pillColor, 0.5)
-                : Color.lerp(Colors.white, pillColor, 0.8),
+            color: Theme.of(context).brightness == Brightness.dark ? Color.lerp(Colors.black, pillColor, 0.5) : Color.lerp(Colors.white, pillColor, 0.8),
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: textColor.withOpacity(0.3), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: textColor.withOpacity(0.1),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            boxShadow: [BoxShadow(color: textColor.withOpacity(0.1), blurRadius: 16, offset: const Offset(0, 4))],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -72,24 +62,12 @@ class OfflineIndicator extends ConsumerWidget {
               if (showLoader)
                 Padding(
                   padding: const EdgeInsets.only(right: 8.0),
-                  child: SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(textColor),
-                    ),
-                  ),
+                  child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(textColor))),
                 )
               else
                 Icon(icon, color: textColor, size: 16),
               const SizedBox(width: 8),
-              Text(
-                message,
-                style: AppTextStyles.caption(textColor).copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text(message, style: AppTextStyles.caption(textColor).copyWith(fontWeight: FontWeight.w600)),
             ],
           ),
         );

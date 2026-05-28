@@ -15,7 +15,7 @@ class WorkspaceRemoteDataSource {
 
   void _seedData() {
     AppLogger.d('Seeding cloud mock database with starter workspaces and docs...');
-    
+
     // Seed Workspaces
     _remoteWorkspaces.addAll([
       WorkspaceModel(
@@ -40,7 +40,8 @@ class WorkspaceRemoteDataSource {
         id: 'doc_arch_spec',
         workspaceId: 'ws_eng_team',
         title: 'System Architecture Specification',
-        content: 'Our core app is constructed using a Feature-First Clean Architecture.\n'
+        content:
+            'Our core app is constructed using a Feature-First Clean Architecture.\n'
             'State management is handled by Riverpod.\n'
             'Local database storage uses a lightweight JSON-based Hive implementation.\n\n'
             'Developers must adhere to standard logger patterns and completely avoid print statements.',
@@ -51,7 +52,8 @@ class WorkspaceRemoteDataSource {
         id: 'doc_sprint_goals',
         workspaceId: 'ws_eng_team',
         title: 'Sprint 24 Goals',
-        content: '1. Setup Clean Architecture scaffolding.\n'
+        content:
+            '1. Setup Clean Architecture scaffolding.\n'
             '2. Integrate Riverpod state flows.\n'
             '3. Support full offline caching.\n'
             '4. Implement responsive Web & Mobile split-pane layout.',
@@ -62,7 +64,8 @@ class WorkspaceRemoteDataSource {
         id: 'doc_brand_assets',
         workspaceId: 'ws_marketing',
         title: 'Brand Colors & Aesthetics',
-        content: 'Primary Color: Indigo (HSL 239, 84%, 66%)\n'
+        content:
+            'Primary Color: Indigo (HSL 239, 84%, 66%)\n'
             'Background Color: Dark Slate (Slate 900)\n'
             'Typography: Outfit for branding, Inter for functional UI body text.\n\n'
             'This styling gives a state-of-the-art developer tools feeling.',
@@ -106,7 +109,7 @@ class WorkspaceRemoteDataSource {
   Future<DocumentModel> updateDocument(DocumentModel doc) async {
     AppLogger.d('PUT /documents/${doc.id} ...');
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     final index = _remoteDocuments.indexWhere((element) => element.id == doc.id);
     if (index != -1) {
       _remoteDocuments[index] = doc;

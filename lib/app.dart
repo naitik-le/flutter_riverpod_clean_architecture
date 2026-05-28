@@ -28,11 +28,7 @@ class App extends ConsumerWidget {
     if (state is Authenticated) {
       return const DashboardScreen();
     } else if (state is AuthLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     } else {
       // Unauthenticated, AuthInitial, or login errors
       return const LoginScreen();

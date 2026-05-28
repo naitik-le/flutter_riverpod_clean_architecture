@@ -7,13 +7,7 @@ class WorkspaceModel {
   final String ownerId;
   final DateTime createdAt;
 
-  const WorkspaceModel({
-    required this.id,
-    required this.name,
-    required this.description,
-    required this.ownerId,
-    required this.createdAt,
-  });
+  const WorkspaceModel({required this.id, required this.name, required this.description, required this.ownerId, required this.createdAt});
 
   /// Factory helper to build model from standard JSON map
   factory WorkspaceModel.fromJson(Map<String, dynamic> json) {
@@ -28,29 +22,11 @@ class WorkspaceModel {
 
   /// Converts the workspace state into JSON map representation
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'description': description,
-      'ownerId': ownerId,
-      'createdAt': createdAt.toIso8601String(),
-    };
+    return {'id': id, 'name': name, 'description': description, 'ownerId': ownerId, 'createdAt': createdAt.toIso8601String()};
   }
 
   /// Helper to duplicate a workspace model with minor updates
-  WorkspaceModel copyWith({
-    String? id,
-    String? name,
-    String? description,
-    String? ownerId,
-    DateTime? createdAt,
-  }) {
-    return WorkspaceModel(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      description: description ?? this.description,
-      ownerId: ownerId ?? this.ownerId,
-      createdAt: createdAt ?? this.createdAt,
-    );
+  WorkspaceModel copyWith({String? id, String? name, String? description, String? ownerId, DateTime? createdAt}) {
+    return WorkspaceModel(id: id ?? this.id, name: name ?? this.name, description: description ?? this.description, ownerId: ownerId ?? this.ownerId, createdAt: createdAt ?? this.createdAt);
   }
 }

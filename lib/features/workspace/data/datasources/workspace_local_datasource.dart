@@ -5,19 +5,17 @@ import '../../domain/models/workspace_model.dart';
 import '../../domain/models/document_model.dart';
 
 /// WorkspaceLocalDataSource manages the translation of domain models
-/// to and from raw cached JSON strings in Hive boxes, bypassing generated adapters.
+/// to and from raw cached JSON strings in SQFlite cache tables.
 class WorkspaceLocalDataSource {
   final CacheService _cache;
 
   WorkspaceLocalDataSource(this._cache);
 
   /// Retrieves cached workspaces.
-  List<WorkspaceModel> getWorkspaces() {
+  Future<List<WorkspaceModel>> getWorkspaces() async {
     try {
-      final list = _cache.getAll(CacheService.workspaceBoxName);
-      return list
-          .map((item) => WorkspaceModel.fromJson(jsonDecode(item as String) as Map<String, dynamic>))
-          .toList();
+      final list = await _cache.getAll(CacheService.workspaceBoxName);
+      return list.map((item) => WorkspaceModel.fromJson(jsonDecode(item as String) as Map<String, dynamic>)).toList();
     } catch (e) {
       AppLogger.w('Failed to parse cached workspaces: $e');
       return [];
@@ -28,22 +26,15 @@ class WorkspaceLocalDataSource {
   Future<void> saveWorkspaces(List<WorkspaceModel> list) async {
     await _cache.clear(CacheService.workspaceBoxName);
     for (final ws in list) {
-      await _cache.put(
-        CacheService.workspaceBoxName,
-        ws.id,
-        jsonEncode(ws.toJson()),
-      );
+      await _cache.put(CacheService.workspaceBoxName, ws.id, jsonEncode(ws.toJson()));
     }
   }
 
   /// Retrieves cached documents for a given workspace.
-  List<DocumentModel> getDocuments(String workspaceId) {
+  Future<List<DocumentModel>> getDocuments(String workspaceId) async {
     try {
-      final list = _cache.getAll(CacheService.documentBoxName);
-      return list
-          .map((item) => DocumentModel.fromJson(jsonDecode(item as String) as Map<String, dynamic>))
-          .where((doc) => doc.workspaceId == workspaceId)
-          .toList();
+      final list = await _cache.getAll(CacheService.documentBoxName);
+      return list.map((item) => DocumentModel.fromJson(jsonDecode(item as String) as Map<String, dynamic>)).where((doc) => doc.workspaceId == workspaceId).toList();
     } catch (e) {
       AppLogger.w('Failed to parse cached documents: $e');
       return [];
@@ -52,11 +43,7 @@ class WorkspaceLocalDataSource {
 
   /// Caches a single document (adds or updates).
   Future<void> saveDocument(DocumentModel doc) async {
-    await _cache.put(
-      CacheService.documentBoxName,
-      doc.id,
-      jsonEncode(doc.toJson()),
-    );
+    await _cache.put(CacheService.documentBoxName, doc.id, jsonEncode(doc.toJson()));
   }
 
   /// Caches a list of documents.
@@ -69,12 +56,10 @@ class WorkspaceLocalDataSource {
   // --- Offline Sync Queue Helpers ---
 
   /// Retrieves the current queued offline actions
-  List<Map<String, dynamic>> getSyncQueue() {
+  Future<List<Map<String, dynamic>>> getSyncQueue() async {
     try {
-      final rawList = _cache.getAll(CacheService.syncQueueBoxName);
-      return rawList
-          .map((item) => jsonDecode(item as String) as Map<String, dynamic>)
-          .toList();
+      final rawList = await _cache.getAll(CacheService.syncQueueBoxName);
+      return rawList.map((item) => jsonDecode(item as String) as Map<String, dynamic>).toList();
     } catch (e) {
       AppLogger.e('Failed to parse sync queue: $e');
       return [];
@@ -83,11 +68,7 @@ class WorkspaceLocalDataSource {
 
   /// Appends an action command (like create or update doc) to the offline queue
   Future<void> enqueueAction(String actionId, Map<String, dynamic> actionMap) async {
-    await _cache.put(
-      CacheService.syncQueueBoxName,
-      actionId,
-      jsonEncode(actionMap),
-    );
+    await _cache.put(CacheService.syncQueueBoxName, actionId, jsonEncode(actionMap));
     AppLogger.d('Enqueued offline action: $actionId');
   }
 

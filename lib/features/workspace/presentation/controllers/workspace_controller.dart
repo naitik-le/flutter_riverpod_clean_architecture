@@ -28,7 +28,7 @@ class WorkspaceController extends StateNotifier<AsyncValue<List<WorkspaceModel>>
     final currentList = state.value ?? [];
     try {
       final newWorkspace = await _repo.createWorkspace(name, description);
-      
+
       // Update UI state immediately (optimistic UI flow)
       state = AsyncValue.data([...currentList, newWorkspace]);
     } catch (e, stack) {

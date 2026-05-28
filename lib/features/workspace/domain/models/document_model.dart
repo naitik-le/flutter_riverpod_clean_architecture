@@ -10,15 +10,7 @@ class DocumentModel {
   final DateTime updatedAt;
   final bool isSynced;
 
-  const DocumentModel({
-    required this.id,
-    required this.workspaceId,
-    required this.title,
-    required this.content,
-    required this.lastUpdatedBy,
-    required this.updatedAt,
-    this.isSynced = true,
-  });
+  const DocumentModel({required this.id, required this.workspaceId, required this.title, required this.content, required this.lastUpdatedBy, required this.updatedAt, this.isSynced = true});
 
   /// Factory helper to build model from standard JSON map
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
@@ -35,27 +27,11 @@ class DocumentModel {
 
   /// Converts the document state into JSON map representation
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'workspaceId': workspaceId,
-      'title': title,
-      'content': content,
-      'lastUpdatedBy': lastUpdatedBy,
-      'updatedAt': updatedAt.toIso8601String(),
-      'isSynced': isSynced,
-    };
+    return {'id': id, 'workspaceId': workspaceId, 'title': title, 'content': content, 'lastUpdatedBy': lastUpdatedBy, 'updatedAt': updatedAt.toIso8601String(), 'isSynced': isSynced};
   }
 
   /// Helper to duplicate a document model with minor updates
-  DocumentModel copyWith({
-    String? id,
-    String? workspaceId,
-    String? title,
-    String? content,
-    String? lastUpdatedBy,
-    DateTime? updatedAt,
-    bool? isSynced,
-  }) {
+  DocumentModel copyWith({String? id, String? workspaceId, String? title, String? content, String? lastUpdatedBy, DateTime? updatedAt, bool? isSynced}) {
     return DocumentModel(
       id: id ?? this.id,
       workspaceId: workspaceId ?? this.workspaceId,

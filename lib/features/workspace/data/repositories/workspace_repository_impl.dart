@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/network/connectivity_service.dart';
 import '../../../../core/storage/cache_service.dart';
@@ -18,7 +17,12 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
   final WorkspaceLocalDataSource _local;
   final WorkspaceRemoteDataSource _remote;
   final ConnectivityService _connectivity;
+  final CacheService _cache;
   final _uuid = const Uuid();
+
+  // Reentrancy safety locks for offline sync queue execution
+  bool _isSyncing = false;
+  Completer<void>? _syncCompleter;
 
   // Controller to emit remaining transactions in offline sync queue
   final _syncQueueController = StreamController<int>.broadcast();
@@ -27,9 +31,11 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
     required WorkspaceLocalDataSource local,
     required WorkspaceRemoteDataSource remote,
     required ConnectivityService connectivity,
+    required CacheService cache,
   })  : _local = local,
         _remote = remote,
-        _connectivity = connectivity {
+        _connectivity = connectivity,
+        _cache = cache {
     _initConnectivityListener();
   }
 
@@ -42,17 +48,17 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
       }
     });
 
-    // Watch Hive sync queue box to emit count changes
-    Hive.box(CacheService.syncQueueBoxName).watch().listen((_) {
+    // Watch SQLite sync queue box updates to emit count changes
+    _cache.watchBox(CacheService.syncQueueBoxName).listen((_) {
       _emitQueueLength();
     });
     // Emit initial length
     _emitQueueLength();
   }
 
-  void _emitQueueLength() {
+  void _emitQueueLength() async {
     if (!_syncQueueController.isClosed) {
-      final len = Hive.box(CacheService.syncQueueBoxName).length;
+      final len = await _cache.getLength(CacheService.syncQueueBoxName);
       _syncQueueController.add(len);
     }
   }
@@ -63,21 +69,24 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
   @override
   Future<List<WorkspaceModel>> getWorkspaces() async {
     // 1. Return cache immediately
-    final cached = _local.getWorkspaces();
-    AppLogger.d('Returning ${cached.length} workspaces from cache.');
+    final cached = await _local.getWorkspaces();
+    AppLogger.d('Returning ${cached.length} workspaces from SQLite cache.');
 
     // 2. Fetch remote in the background if online
     if (await _connectivity.isOnline) {
       try {
+        // Sync any pending offline changes first to avoid race conditions and overwrites
+        await syncPendingOfflineEdits();
+
         final remoteData = await _remote.getWorkspaces();
         await _local.saveWorkspaces(remoteData);
-        AppLogger.i('Workspaces updated from network and cached.');
+        AppLogger.i('Workspaces updated from network and SQLite cached.');
         return remoteData;
       } catch (e, stack) {
         AppLogger.e('Failed to fetch workspaces from network, using cache', e, stack);
       }
     }
-    
+
     return cached;
   }
 
@@ -91,8 +100,8 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
       createdAt: DateTime.now(),
     );
 
-    // Save to local cache first
-    final currentCached = _local.getWorkspaces();
+    // Save to local SQLite cache first
+    final currentCached = await _local.getWorkspaces();
     currentCached.add(workspace);
     await _local.saveWorkspaces(currentCached);
 
@@ -115,16 +124,19 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
   @override
   Future<List<DocumentModel>> getDocuments(String workspaceId) async {
     // 1. Return cache immediately
-    final cached = _local.getDocuments(workspaceId);
-    AppLogger.d('Returning ${cached.length} documents for workspace $workspaceId from cache.');
+    final cached = await _local.getDocuments(workspaceId);
+    AppLogger.d('Returning ${cached.length} documents for workspace $workspaceId from SQLite cache.');
 
     // 2. Fetch remote in the background if online
     if (await _connectivity.isOnline) {
       try {
+        // Sync any pending offline changes first to avoid race conditions and overwrites
+        await syncPendingOfflineEdits();
+
         final remoteData = await _remote.getDocuments(workspaceId);
         await _local.saveDocuments(remoteData);
         AppLogger.i('Documents for $workspaceId updated from network.');
-        return _local.getDocuments(workspaceId); // Return newly cached list (merging changes)
+        return await _local.getDocuments(workspaceId); // Return newly cached list (merging changes)
       } catch (e, stack) {
         AppLogger.e('Failed to fetch documents for $workspaceId from network', e, stack);
       }
@@ -146,7 +158,7 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
       isSynced: isOnline,
     );
 
-    // Save locally
+    // Save locally to SQLite
     await _local.saveDocument(document);
 
     if (isOnline) {
@@ -176,7 +188,7 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
       isSynced: isOnline,
     );
 
-    // Save locally immediately
+    // Save locally to SQLite immediately
     await _local.saveDocument(updatedDoc);
 
     if (isOnline) {
@@ -201,67 +213,78 @@ class WorkspaceRepositoryImpl implements WorkspaceRepository {
 
   @override
   Future<void> syncPendingOfflineEdits() async {
+    if (_isSyncing) {
+      // If already syncing, await the active sync process to finish
+      await _syncCompleter?.future;
+      return;
+    }
+
     final isOnline = await _connectivity.isOnline;
     if (!isOnline) {
       AppLogger.w('Sync execution aborted: device remains offline.');
       return;
     }
 
-    final queue = _local.getSyncQueue();
+    final queue = await _local.getSyncQueue();
     if (queue.isEmpty) {
       AppLogger.i('Offline sync queue is empty. No operations to sync.');
       return;
     }
 
-    AppLogger.i('Beginning synchronization of ${queue.length} pending changes...');
+    _isSyncing = true;
+    _syncCompleter = Completer<void>();
 
-    for (final action in queue) {
-      final actionId = action['actionId'] as String;
-      final type = action['type'] as String;
-      final data = action['data'] as Map<String, dynamic>;
+    try {
+      AppLogger.i('Beginning synchronization of ${queue.length} pending changes...');
 
-      try {
-        if (type == 'create_workspace') {
-          final ws = WorkspaceModel.fromJson(data);
-          await _remote.createWorkspace(ws);
-          AppLogger.i('Offline action synced: Created workspace "${ws.name}" on remote.');
-        } else if (type == 'create_document') {
-          final doc = DocumentModel.fromJson(data);
-          await _remote.createDocument(doc);
-          
-          // Mark document as synced locally
-          final syncedDoc = doc.copyWith(isSynced: true);
-          await _local.saveDocument(syncedDoc);
-          AppLogger.i('Offline action synced: Created document "${doc.title}" on remote.');
-        } else if (type == 'update_document') {
-          final doc = DocumentModel.fromJson(data);
-          await _remote.updateDocument(doc);
+      for (final action in queue) {
+        final actionId = action['actionId'] as String;
+        final type = action['type'] as String;
+        final data = action['data'] as Map<String, dynamic>;
 
-          // Mark document as synced locally
-          final syncedDoc = doc.copyWith(isSynced: true);
-          await _local.saveDocument(syncedDoc);
-          AppLogger.i('Offline action synced: Updated document "${doc.title}" on remote.');
+        try {
+          if (type == 'create_workspace') {
+            final ws = WorkspaceModel.fromJson(data);
+            await _remote.createWorkspace(ws);
+            AppLogger.i('Offline action synced: Created workspace "${ws.name}" on remote.');
+          } else if (type == 'create_document') {
+            final doc = DocumentModel.fromJson(data);
+            await _remote.createDocument(doc);
+
+            // Mark document as synced locally
+            final syncedDoc = doc.copyWith(isSynced: true);
+            await _local.saveDocument(syncedDoc);
+            AppLogger.i('Offline action synced: Created document "${doc.title}" on remote.');
+          } else if (type == 'update_document') {
+            final doc = DocumentModel.fromJson(data);
+            await _remote.updateDocument(doc);
+
+            // Mark document as synced locally
+            final syncedDoc = doc.copyWith(isSynced: true);
+            await _local.saveDocument(syncedDoc);
+            AppLogger.i('Offline action synced: Updated document "${doc.title}" on remote.');
+          }
+
+          // Successfully synced, remove from SQLite queue
+          await _local.dequeueAction(actionId);
+        } catch (e, stack) {
+          AppLogger.e('Failed syncing offline action $actionId ($type)', e, stack);
+          // Break out to avoid infinite crash loops if remote is acting up
+          break;
         }
-
-        // Successfully synced, remove from queue
-        await _local.dequeueAction(actionId);
-      } catch (e, stack) {
-        AppLogger.e('Failed syncing offline action $actionId ($type)', e, stack);
-        // Break out to avoid infinite crash loops if remote is acting up
-        break;
       }
-    }
 
-    AppLogger.i('Synchronization playback complete.');
-    _emitQueueLength();
+      AppLogger.i('Synchronization playback complete.');
+      _emitQueueLength();
+    } finally {
+      _isSyncing = false;
+      _syncCompleter?.complete();
+      _syncCompleter = null;
+    }
   }
 
   Future<void> _enqueueAction(String id, String type, Map<String, dynamic> dataJson) async {
-    final actionMap = {
-      'actionId': id,
-      'type': type,
-      'data': dataJson,
-    };
+    final actionMap = {'actionId': id, 'type': type, 'data': dataJson};
     await _local.enqueueAction(id, actionMap);
     _emitQueueLength();
   }
@@ -288,13 +311,15 @@ final workspaceRepositoryProvider = Provider<WorkspaceRepository>((ref) {
   final local = ref.watch(workspaceLocalDataSourceProvider);
   final remote = ref.watch(workspaceRemoteDataSourceProvider);
   final connectivity = ref.watch(connectivityServiceProvider);
-  
+  final cache = ref.watch(cacheServiceProvider);
+
   final repo = WorkspaceRepositoryImpl(
     local: local,
     remote: remote,
     connectivity: connectivity,
+    cache: cache,
   );
-  
+
   ref.onDispose(() => repo.dispose());
   return repo;
 });

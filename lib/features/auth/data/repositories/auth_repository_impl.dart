@@ -16,10 +16,7 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<UserModel?> getCurrentUser() async {
     try {
-      final cachedJson = _cacheService.get<String>(
-        CacheService.settingsBoxName,
-        _userCacheKey,
-      );
+      final cachedJson = await _cacheService.get<String>(CacheService.settingsBoxName, _userCacheKey);
       if (cachedJson != null) {
         AppLogger.i('Active user restored from offline cache.');
         return UserModel.fromJson(jsonDecode(cachedJson) as Map<String, dynamic>);
@@ -39,19 +36,10 @@ class AuthRepositoryImpl implements AuthRepository {
     if (email.contains('@') && password.length >= 6) {
       // Create user details (In production, this would come from the API payload)
       final name = email.split('@').first;
-      final user = UserModel(
-        id: 'usr_mock_${name.toLowerCase()}',
-        name: name[0].toUpperCase() + name.substring(1),
-        email: email,
-        avatarUrl: 'https://api.dicebear.com/7.x/bottts/png?seed=$name',
-      );
+      final user = UserModel(id: 'usr_mock_${name.toLowerCase()}', name: name[0].toUpperCase() + name.substring(1), email: email, avatarUrl: 'https://api.dicebear.com/7.x/bottts/png?seed=$name');
 
       // Persist user in offline cache
-      await _cacheService.put(
-        CacheService.settingsBoxName,
-        _userCacheKey,
-        jsonEncode(user.toJson()),
-      );
+      await _cacheService.put(CacheService.settingsBoxName, _userCacheKey, jsonEncode(user.toJson()));
 
       AppLogger.i('User ${user.name} logged in and cached locally.');
       return user;

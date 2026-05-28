@@ -16,7 +16,7 @@ class AppTheme {
       brightness: Brightness.light,
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.bgLight,
-      
+
       // Color Scheme
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
@@ -51,10 +51,7 @@ class AppTheme {
         filled: true,
         fillColor: AppColors.surfaceElevatedLight,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: _borderRadius,
-          borderSide: BorderSide.none,
-        ),
+        border: OutlineInputBorder(borderRadius: _borderRadius, borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
           borderRadius: _borderRadius,
           borderSide: const BorderSide(color: AppColors.borderLight, width: 1),
@@ -94,11 +91,7 @@ class AppTheme {
       ),
 
       // Divider Theme
-      dividerTheme: const DividerThemeData(
-        color: AppColors.borderLight,
-        thickness: 1,
-        space: 1,
-      ),
+      dividerTheme: const DividerThemeData(color: AppColors.borderLight, thickness: 1, space: 1),
     );
   }
 
@@ -109,7 +102,7 @@ class AppTheme {
       brightness: Brightness.dark,
       primaryColor: AppColors.primary,
       scaffoldBackgroundColor: AppColors.bgDark,
-      
+
       // Color Scheme
       colorScheme: const ColorScheme.dark(
         primary: AppColors.primary,
@@ -144,10 +137,7 @@ class AppTheme {
         filled: true,
         fillColor: AppColors.surfaceDark,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: _borderRadius,
-          borderSide: BorderSide.none,
-        ),
+        border: OutlineInputBorder(borderRadius: _borderRadius, borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
           borderRadius: _borderRadius,
           borderSide: const BorderSide(color: AppColors.borderDark, width: 1),
@@ -187,11 +177,7 @@ class AppTheme {
       ),
 
       // Divider Theme
-      dividerTheme: const DividerThemeData(
-        color: AppColors.borderDark,
-        thickness: 1,
-        space: 1,
-      ),
+      dividerTheme: const DividerThemeData(color: AppColors.borderDark, thickness: 1, space: 1),
     );
   }
 }

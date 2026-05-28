@@ -2,18 +2,18 @@ import 'package:logger/logger.dart';
 
 /// AppLogger encapsulates the 'logger' package to provide beautiful,
 /// color-coded, structured logs for Web and Mobile target platforms.
-/// 
+///
 /// Avoid using `print` directly; instead, invoke [AppLogger.d], [AppLogger.e], etc.
 class AppLogger {
   // Configured with standard formatting, showing time and no stacktrace for simple logs
   static final Logger _logger = Logger(
     printer: PrettyPrinter(
-      methodCount: 2,         // Number of method calls to be displayed
-      errorMethodCount: 8,    // Number of method calls if stacktrace is provided
-      lineLength: 80,         // Width of the output
-      colors: true,           // Colorful log messages (works in terminal/IDE consoles)
-      printEmojis: true,      // Print emojis for log levels
-      printTime: true,        // Should each log print contain a timestamp
+      methodCount: 2, // Number of method calls to be displayed
+      errorMethodCount: 8, // Number of method calls if stacktrace is provided
+      lineLength: 80, // Width of the output
+      colors: true, // Colorful log messages (works in terminal/IDE consoles)
+      printEmojis: true, // Print emojis for log levels
+      printTime: true, // Should each log print contain a timestamp
     ),
   );
 

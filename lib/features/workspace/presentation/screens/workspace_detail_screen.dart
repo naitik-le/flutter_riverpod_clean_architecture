@@ -15,17 +15,13 @@ import '../widgets/offline_indicator.dart';
 class WorkspaceDetailScreen extends ConsumerStatefulWidget {
   final WorkspaceModel workspace;
 
-  const WorkspaceDetailScreen({
-    super.key,
-    required this.workspace,
-  });
+  const WorkspaceDetailScreen({super.key, required this.workspace});
 
   @override
   ConsumerState<WorkspaceDetailScreen> createState() => _WorkspaceDetailScreenState();
 }
 
 class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
-  DocumentModel? _selectedDocument;
   final _contentController = TextEditingController();
 
   @override
@@ -44,10 +40,8 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
   }
 
   void _selectDocument(DocumentModel doc) {
-    setState(() {
-      _selectedDocument = doc;
-      _contentController.text = doc.content;
-    });
+    ref.read(activeDocumentProvider.notifier).state = doc;
+    _contentController.text = doc.content;
   }
 
   void _createNewDocument(BuildContext context) {
@@ -65,10 +59,7 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
             key: formKey,
             child: TextFormField(
               controller: titleController,
-              decoration: const InputDecoration(
-                labelText: 'Document Title',
-                hintText: 'e.g. Sprint Architecture Spec',
-              ),
+              decoration: const InputDecoration(labelText: 'Document Title', hintText: 'e.g. Sprint Architecture Spec'),
               validator: (val) => val == null || val.isEmpty ? 'Title is required' : null,
             ),
           ),
@@ -80,10 +71,7 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
             ElevatedButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) {
-                  ref.read(documentControllerProvider.notifier).addDocument(
-                        titleController.text.trim(),
-                        'Start editing your collaborative canvas here...',
-                      );
+                  ref.read(documentControllerProvider.notifier).addDocument(titleController.text.trim(), 'Start editing your collaborative canvas here...');
                   Navigator.pop(context);
                 }
               },
@@ -99,10 +87,10 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
   Widget build(BuildContext context) {
     final documentsAsync = ref.watch(documentControllerProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     final textThemeColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
     final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    
+
     // Watch connection dynamically to update connection switch
     final connectionAsync = ref.watch(connectivityStatusProvider);
     final isOnline = connectionAsync.value == ConnectivityStatus.online;
@@ -110,23 +98,28 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
     // Detect if we should use responsive split pane
     final isDesktop = ResponsiveLayout.isDesktop(context);
 
-    // Sync selected document state when the document list changes (e.g., isSynced changes)
-    documentsAsync.whenData((docs) {
-      if (_selectedDocument != null) {
-        final matchingDocIndex = docs.indexWhere((d) => d.id == _selectedDocument!.id);
-        if (matchingDocIndex != -1) {
-          final matchingDoc = docs[matchingDocIndex];
-          if (matchingDoc.isSynced != _selectedDocument!.isSynced || 
-              (matchingDoc.content != _selectedDocument!.content && 
-               _contentController.text != matchingDoc.content)) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              setState(() {
-                _selectedDocument = matchingDoc;
-              });
-            });
-          }
+    // Watch active document pointer in Riverpod
+    final activeDoc = ref.watch(activeDocumentProvider);
+
+    // Synchronize text controller when active document changes
+    ref.listen<DocumentModel?>(activeDocumentProvider, (prev, next) {
+      if (next != null && prev?.id != next.id) {
+        _contentController.text = next.content;
+      }
+    });
+
+    // Update active document sync/content pointers dynamically when list shifts
+    ref.listen<AsyncValue<List<DocumentModel>>>(documentControllerProvider, (prev, next) {
+      final docs = next.value;
+      final currentActive = ref.read(activeDocumentProvider);
+      if (docs != null && currentActive != null) {
+        final matchingDoc = docs.firstWhere((d) => d.id == currentActive.id, orElse: () => currentActive);
+        if (matchingDoc != currentActive && (matchingDoc.isSynced != currentActive.isSynced || matchingDoc.content != currentActive.content)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(activeDocumentProvider.notifier).state = matchingDoc;
+          });
         }
-      } else if (docs.isNotEmpty && isDesktop) {
+      } else if (docs != null && docs.isNotEmpty && currentActive == null && isDesktop) {
         // Auto select first document on desktop if nothing selected
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _selectDocument(docs.first);
@@ -141,16 +134,8 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
           // SIMULATOR CONTROL: Dynamic switch to test offline-first queuing
           Row(
             children: [
-              Icon(
-                isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded, 
-                color: isOnline ? AppColors.accent : AppColors.warning,
-                size: 18,
-              ),
+              Icon(isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded, color: isOnline ? AppColors.accent : AppColors.warning, size: 18),
               const SizedBox(width: 8),
-              Text(
-                isOnline ? 'Online (Simulated)' : 'Offline (Simulated)',
-                style: AppTextStyles.caption(textThemeColor).copyWith(fontWeight: FontWeight.w600),
-              ),
               Switch(
                 value: isOnline,
                 activeColor: AppColors.accent,
@@ -176,15 +161,14 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
           ],
         ),
       ),
+      floatingActionButton: ResponsiveLayout.isMobile(context)
+          ? FloatingActionButton(onPressed: () => _createNewDocument(context), backgroundColor: AppColors.primary, foregroundColor: Colors.white, child: const Icon(Icons.add_rounded))
+          : null,
     );
   }
 
   // --- RESPONSIVE MOBILE VIEW ---
-  Widget _buildMobileBody(
-    AsyncValue<List<DocumentModel>> documentsAsync,
-    Color textThemeColor,
-    Color secondaryTextColor,
-  ) {
+  Widget _buildMobileBody(AsyncValue<List<DocumentModel>> documentsAsync, Color textThemeColor, Color secondaryTextColor) {
     return documentsAsync.when(
       data: (docs) {
         if (docs.isEmpty) {
@@ -196,11 +180,7 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
                 const SizedBox(height: 16),
                 Text('No documents in this workspace', style: AppTextStyles.bodyMedium(secondaryTextColor)),
                 const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => _createNewDocument(context),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Document'),
-                ),
+                ElevatedButton.icon(onPressed: () => _createNewDocument(context), icon: const Icon(Icons.add), label: const Text('Add Document')),
               ],
             ),
           );
@@ -216,20 +196,10 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
               child: ListTile(
                 onTap: () {
                   _selectDocument(doc);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => _buildMobileEditorScreen(doc),
-                    ),
-                  );
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => _buildMobileEditorScreen(doc)));
                 },
                 title: Text(doc.title, style: AppTextStyles.bodySemiBold(textThemeColor)),
-                subtitle: Text(
-                  doc.content,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption(secondaryTextColor),
-                ),
+                subtitle: Text(doc.content, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.caption(secondaryTextColor)),
                 trailing: _buildSyncStatusBadge(doc),
               ),
             );
@@ -243,13 +213,15 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
 
   // --- MOBILE SUB-PAGE EDITOR ---
   Widget _buildMobileEditorScreen(DocumentModel doc) {
+    final activeDoc = ref.watch(activeDocumentProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(doc.title),
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(child: _buildSyncStatusBadge(_selectedDocument ?? doc)),
+            child: Center(child: _buildSyncStatusBadge(activeDoc ?? doc)),
           ),
         ],
       ),
@@ -267,19 +239,11 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
                         controller: _contentController,
                         maxLines: null,
                         expands: true,
-                        decoration: const InputDecoration(
-                          hintText: 'Start writing...',
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          filled: false,
-                        ),
+                        decoration: const InputDecoration(hintText: 'Start writing...', border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, filled: false),
                         onChanged: (text) {
-                          if (_selectedDocument != null) {
-                            ref.read(documentControllerProvider.notifier).editDocument(
-                                  _selectedDocument!,
-                                  text,
-                                );
+                          final currentActive = ref.read(activeDocumentProvider);
+                          if (currentActive != null) {
+                            ref.read(documentControllerProvider.notifier).editDocument(currentActive, text);
                           }
                         },
                       ),
@@ -288,14 +252,8 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '${_contentController.text.length} characters',
-                          style: AppTextStyles.caption(AppColors.textMutedDark),
-                        ),
-                        Text(
-                          'Optimistic Sync Mode',
-                          style: AppTextStyles.caption(AppColors.accent),
-                        ),
+                        Text('${_contentController.text.length} characters', style: AppTextStyles.caption(AppColors.textMutedDark)),
+                        Text('Optimistic Sync Mode', style: AppTextStyles.caption(AppColors.accent)),
                       ],
                     ),
                   ],
@@ -309,12 +267,10 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
   }
 
   // --- RESPONSIVE WEB/DESKTOP VIEW ---
-  Widget _buildDesktopBody(
-    AsyncValue<List<DocumentModel>> documentsAsync,
-    Color textThemeColor,
-    Color secondaryTextColor,
-  ) {
+  Widget _buildDesktopBody(AsyncValue<List<DocumentModel>> documentsAsync, Color textThemeColor, Color secondaryTextColor) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeDoc = ref.watch(activeDocumentProvider);
+
     return Row(
       children: [
         // Left Column: Document Switcher Pane
@@ -328,51 +284,27 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: ElevatedButton.icon(
-                  onPressed: () => _createNewDocument(context),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Document'),
-                ),
+                child: ElevatedButton.icon(onPressed: () => _createNewDocument(context), icon: const Icon(Icons.add), label: const Text('Add Document')),
               ),
               const Divider(),
               Expanded(
                 child: documentsAsync.when(
                   data: (docs) {
                     if (docs.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'No documents found.',
-                          style: AppTextStyles.caption(secondaryTextColor),
-                        ),
-                      );
+                      return Center(child: Text('No documents found.', style: AppTextStyles.caption(secondaryTextColor)));
                     }
                     return ListView.builder(
                       itemCount: docs.length,
                       itemBuilder: (context, index) {
                         final doc = docs[index];
-                        final isSelected = _selectedDocument?.id == doc.id;
+                        final isSelected = activeDoc?.id == doc.id;
                         return Container(
                           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isSelected 
-                                ? AppColors.primary.withOpacity(0.1) 
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                          decoration: BoxDecoration(color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent, borderRadius: BorderRadius.circular(8)),
                           child: ListTile(
                             onTap: () => _selectDocument(doc),
-                            title: Text(
-                              doc.title,
-                              style: AppTextStyles.bodySemiBold(
-                                isSelected ? AppColors.primary : textThemeColor,
-                              ),
-                            ),
-                            subtitle: Text(
-                              doc.content,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.caption(secondaryTextColor),
-                            ),
+                            title: Text(doc.title, style: AppTextStyles.bodySemiBold(isSelected ? AppColors.primary : textThemeColor)),
+                            subtitle: Text(doc.content, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.caption(secondaryTextColor)),
                             trailing: _buildSyncStatusBadge(doc),
                           ),
                         );
@@ -390,13 +322,8 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
         // Middle Column: Elegant Document Editor
         Expanded(
           flex: 3,
-          child: _selectedDocument == null
-              ? Center(
-                  child: Text(
-                    'Select a document to begin writing.',
-                    style: AppTextStyles.bodyMedium(secondaryTextColor),
-                  ),
-                )
+          child: activeDoc == null
+              ? Center(child: Text('Select a document to begin writing.', style: AppTextStyles.bodyMedium(secondaryTextColor)))
               : Padding(
                   padding: const EdgeInsets.all(28.0),
                   child: Column(
@@ -405,11 +332,8 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            _selectedDocument!.title,
-                            style: AppTextStyles.h1(textThemeColor),
-                          ),
-                          _buildSyncStatusBadge(_selectedDocument!),
+                          Text(activeDoc.title, style: AppTextStyles.h1(textThemeColor)),
+                          _buildSyncStatusBadge(activeDoc),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -419,9 +343,7 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
                           decoration: BoxDecoration(
                             color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                            ),
+                            border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
                           ),
                           child: TextField(
                             controller: _contentController,
@@ -435,11 +357,9 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
                               filled: false,
                             ),
                             onChanged: (text) {
-                              if (_selectedDocument != null) {
-                                ref.read(documentControllerProvider.notifier).editDocument(
-                                      _selectedDocument!,
-                                      text,
-                                    );
+                              final currentActive = ref.read(activeDocumentProvider);
+                              if (currentActive != null) {
+                                ref.read(documentControllerProvider.notifier).editDocument(currentActive, text);
                               }
                             },
                           ),
@@ -453,10 +373,7 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
                             'Words: ${_contentController.text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length}  |  Characters: ${_contentController.text.length}',
                             style: AppTextStyles.caption(AppColors.textMutedDark),
                           ),
-                          Text(
-                            'Optimistic Local Saving Active',
-                            style: AppTextStyles.caption(AppColors.accent),
-                          ),
+                          Text('Optimistic Local Saving Active', style: AppTextStyles.caption(AppColors.accent)),
                         ],
                       ),
                     ],
@@ -465,7 +382,7 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
         ),
 
         // Right Column: Canvas Details & History Pane
-        if (_selectedDocument != null)
+        if (activeDoc != null)
           Container(
             width: 260,
             decoration: BoxDecoration(
@@ -477,14 +394,10 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
               children: [
                 Text('Canvas Details', style: AppTextStyles.h3(textThemeColor)),
                 const SizedBox(height: 20),
-                _buildInfoTile('Workspace ID', _selectedDocument!.workspaceId, secondaryTextColor),
-                _buildInfoTile('Document ID', _selectedDocument!.id, secondaryTextColor),
-                _buildInfoTile('Last Updated By', _selectedDocument!.lastUpdatedBy, secondaryTextColor),
-                _buildInfoTile(
-                  'Last Updated',
-                  '${_selectedDocument!.updatedAt.hour}:${_selectedDocument!.updatedAt.minute.toString().padLeft(2, '0')}',
-                  secondaryTextColor,
-                ),
+                _buildInfoTile('Workspace ID', activeDoc.workspaceId, secondaryTextColor),
+                _buildInfoTile('Document ID', activeDoc.id, secondaryTextColor),
+                _buildInfoTile('Last Updated By', activeDoc.lastUpdatedBy, secondaryTextColor),
+                _buildInfoTile('Last Updated', '${activeDoc.updatedAt.hour}:${activeDoc.updatedAt.minute.toString().padLeft(2, '0')}', secondaryTextColor),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -495,19 +408,11 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
                   ),
                   child: Column(
                     children: [
-                      Icon(Icons.offline_bolt_rounded, color: AppColors.primary, size: 28),
+                      const Icon(Icons.offline_bolt_rounded, color: AppColors.primary, size: 28),
                       const SizedBox(height: 10),
-                      Text(
-                        'Offline Mode Active',
-                        style: AppTextStyles.bodySemiBold(textThemeColor),
-                        textAlign: TextAlign.center,
-                      ),
+                      Text('Offline Mode Active', style: AppTextStyles.bodySemiBold(textThemeColor), textAlign: TextAlign.center),
                       const SizedBox(height: 6),
-                      Text(
-                        'Disconnect network switch above to trigger queuing logic.',
-                        style: AppTextStyles.caption(secondaryTextColor),
-                        textAlign: TextAlign.center,
-                      ),
+                      Text('Disconnect network switch above to trigger queuing logic.', style: AppTextStyles.caption(secondaryTextColor), textAlign: TextAlign.center),
                     ],
                   ),
                 ),
@@ -536,30 +441,16 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: doc.isSynced 
-            ? AppColors.accent.withOpacity(0.1) 
-            : AppColors.warning.withOpacity(0.1),
+        color: doc.isSynced ? AppColors.accent.withOpacity(0.1) : AppColors.warning.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: doc.isSynced ? AppColors.accent.withOpacity(0.3) : AppColors.warning.withOpacity(0.3),
-        ),
+        border: Border.all(color: doc.isSynced ? AppColors.accent.withOpacity(0.3) : AppColors.warning.withOpacity(0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            doc.isSynced ? Icons.cloud_done_rounded : Icons.offline_pin_rounded,
-            size: 12,
-            color: doc.isSynced ? AppColors.accent : AppColors.warning,
-          ),
+          Icon(doc.isSynced ? Icons.cloud_done_rounded : Icons.offline_pin_rounded, size: 12, color: doc.isSynced ? AppColors.accent : AppColors.warning),
           const SizedBox(width: 6),
-          Text(
-            doc.isSynced ? 'Synced' : 'Sync Pending',
-            style: AppTextStyles.caption(doc.isSynced ? AppColors.accent : AppColors.warning).copyWith(
-              fontWeight: FontWeight.bold,
-              fontSize: 10,
-            ),
-          ),
+          Text(doc.isSynced ? 'Synced' : 'Sync Pending', style: AppTextStyles.caption(doc.isSynced ? AppColors.accent : AppColors.warning).copyWith(fontWeight: FontWeight.bold, fontSize: 10)),
         ],
       ),
     );

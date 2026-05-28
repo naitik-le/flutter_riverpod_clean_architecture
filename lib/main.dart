@@ -20,11 +20,6 @@ void main() async {
   runApp(
     // Wrap root with ProviderScope to activate Riverpod across all widgets.
     // Injected CacheService is registered here to be shared throughout the project lifecycle.
-    ProviderScope(
-      overrides: [
-        cacheServiceProvider.overrideWithValue(cacheService),
-      ],
-      child: const App(),
-    ),
+    ProviderScope(overrides: [cacheServiceProvider.overrideWithValue(cacheService)], child: const App()),
   );
 }

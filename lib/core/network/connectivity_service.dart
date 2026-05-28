@@ -4,10 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/app_logger.dart';
 
 /// ConnectivityStatus represents the internet connection state
-enum ConnectivityStatus {
-  online,
-  offline,
-}
+enum ConnectivityStatus { online, offline }
 
 /// Service that monitors and handles internet connectivity.
 class ConnectivityService {
@@ -51,13 +48,12 @@ class ConnectivityService {
 
   void _updateStatus(List<ConnectivityResult> results) {
     if (isSimulatedOffline) return;
-    
+
     // If the list contains only 'none' or is empty, the user is offline
-    final isOffline = results.isEmpty || 
-        (results.length == 1 && results.first == ConnectivityResult.none);
-    
+    final isOffline = results.isEmpty || (results.length == 1 && results.first == ConnectivityResult.none);
+
     final status = isOffline ? ConnectivityStatus.offline : ConnectivityStatus.online;
-    
+
     AppLogger.d('Network status updated: $status (Raw results: $results)');
     _controller.add(status);
   }

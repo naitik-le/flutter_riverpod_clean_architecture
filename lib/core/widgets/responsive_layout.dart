@@ -8,12 +8,7 @@ class ResponsiveLayout extends StatelessWidget {
   final Widget? tabletBody;
   final Widget desktopBody;
 
-  const ResponsiveLayout({
-    super.key,
-    required this.mobileBody,
-    this.tabletBody,
-    required this.desktopBody,
-  });
+  const ResponsiveLayout({super.key, required this.mobileBody, this.tabletBody, required this.desktopBody});
 
   // Screen Width Breakpoints
   static const double mobileMaxBreakpoint = 600.0;

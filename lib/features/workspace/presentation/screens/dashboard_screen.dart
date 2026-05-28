@@ -5,6 +5,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../controllers/workspace_controller.dart';
 import '../widgets/offline_indicator.dart';
+import 'package:collaborative_workspace_app/features/game/game_screen.dart';
 import 'workspace_detail_screen.dart';
 
 /// DashboardScreen is the command center showing collaborative environments.
@@ -52,10 +53,7 @@ class DashboardScreen extends ConsumerWidget {
             ElevatedButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) {
-                  ref.read(workspaceControllerProvider.notifier).addWorkspace(
-                        nameController.text.trim(),
-                        descController.text.trim(),
-                      );
+                  ref.read(workspaceControllerProvider.notifier).addWorkspace(nameController.text.trim(), descController.text.trim());
                   Navigator.pop(context);
                 }
               },
@@ -75,48 +73,121 @@ class DashboardScreen extends ConsumerWidget {
 
     final textThemeColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
     final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
-            Icon(Icons.layers_rounded, color: AppColors.primary, size: 26),
+            const Icon(Icons.layers_rounded, color: AppColors.primary, size: 26),
             const SizedBox(width: 10),
             Text('SyncSpace Dashboard', style: AppTextStyles.h2(textThemeColor)),
           ],
         ),
         actions: [
-          // Theme toggler
-          // User Profile Card and Logout
-          if (user != null) ...[
+          if (MediaQuery.of(context).size.width <= 600)
             Padding(
               padding: const EdgeInsets.only(right: 8.0),
-              child: CircleAvatar(
-                radius: 16,
-                backgroundColor: AppColors.primary.withOpacity(0.2),
-                backgroundImage: NetworkImage(user.avatarUrl ?? ''),
+              child: IconButton(
+                tooltip: 'Playroom Game',
+                icon: const Icon(Icons.sports_esports_rounded, color: AppColors.primary, size: 26),
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const GameScreen()));
+                },
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(right: 12.0),
-              child: Text(
-                user.name,
-                style: AppTextStyles.bodySemiBold(textThemeColor),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.logout_rounded),
-              tooltip: 'Sign Out',
-              onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-            ),
-          ],
         ],
       ),
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Floating network status bar
             const OfflineIndicator(),
+
+            // Premium User Greeting & Profile Header inside main canvas
+            if (user != null)
+              Container(
+                margin: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.primary.withOpacity(0.2)),
+                      child: ClipOval(
+                        child: Image.network(user.avatarUrl ?? '', fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person)),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Welcome back,', style: AppTextStyles.caption(secondaryTextColor)),
+                          const SizedBox(height: 2),
+                          Text(user.name, style: AppTextStyles.h2(textThemeColor), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => ref.read(authControllerProvider.notifier).logout(),
+                      icon: const Icon(Icons.logout_rounded, size: 14),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        foregroundColor: AppColors.error,
+                        side: BorderSide(color: AppColors.error.withOpacity(0.3)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Team Playroom / Breakroom Launcher Card - Visible only on Desktop/Web
+            if (MediaQuery.of(context).size.width > 600)
+              Container(
+                margin: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [AppColors.primary.withOpacity(0.15), AppColors.accent.withOpacity(0.08)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.2), shape: BoxShape.circle),
+                      child: const Icon(Icons.videogame_asset_rounded, color: AppColors.primary, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Team Breakroom', style: AppTextStyles.bodySemiBold(textThemeColor)),
+                          const SizedBox(height: 2),
+                          Text('Bounce off work stress! Clear bugs and tasks in our interactive breakout game.', style: AppTextStyles.caption(secondaryTextColor)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => const GameScreen()));
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10)),
+                      child: const Text('Play'),
+                    ),
+                  ],
+                ),
+              ),
 
             Expanded(
               child: workspacesAsync.when(
@@ -126,15 +197,11 @@ class DashboardScreen extends ConsumerWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.inbox_outlined, size: 64, color: AppColors.textMutedDark),
+                          const Icon(Icons.inbox_outlined, size: 64, color: AppColors.textMutedDark),
                           const SizedBox(height: 16),
                           Text('No active workspaces.', style: AppTextStyles.h3(secondaryTextColor)),
                           const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: () => _showCreateWorkspaceDialog(context, ref),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Create First Workspace'),
-                          ),
+                          ElevatedButton.icon(onPressed: () => _showCreateWorkspaceDialog(context, ref), icon: const Icon(Icons.add), label: const Text('Create First Workspace')),
                         ],
                       ),
                     );
@@ -144,7 +211,7 @@ class DashboardScreen extends ConsumerWidget {
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       final double width = constraints.maxWidth;
-                      
+
                       // Calculate number of grid columns dynamically
                       final int crossAxisCount;
                       if (width <= 600) {
@@ -157,12 +224,7 @@ class DashboardScreen extends ConsumerWidget {
 
                       return GridView.builder(
                         padding: const EdgeInsets.all(24),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          crossAxisSpacing: 20,
-                          mainAxisSpacing: 20,
-                          childAspectRatio: 1.5,
-                        ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: crossAxisCount, crossAxisSpacing: 20, mainAxisSpacing: 20, childAspectRatio: 1.5),
                         itemCount: workspaces.length,
                         itemBuilder: (context, index) {
                           final ws = workspaces[index];
@@ -170,12 +232,7 @@ class DashboardScreen extends ConsumerWidget {
                             clipBehavior: Clip.antiAlias,
                             child: InkWell(
                               onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => WorkspaceDetailScreen(workspace: ws),
-                                  ),
-                                );
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => WorkspaceDetailScreen(workspace: ws)));
                               },
                               child: Padding(
                                 padding: const EdgeInsets.all(20.0),
@@ -186,46 +243,26 @@ class DashboardScreen extends ConsumerWidget {
                                       children: [
                                         Container(
                                           padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
+                                          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                                           child: Icon(Icons.folder_shared_rounded, color: AppColors.primary, size: 20),
                                         ),
                                         const SizedBox(width: 12),
                                         Expanded(
-                                          child: Text(
-                                            ws.name,
-                                            style: AppTextStyles.h3(textThemeColor),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
+                                          child: Text(ws.name, style: AppTextStyles.h3(textThemeColor), maxLines: 1, overflow: TextOverflow.ellipsis),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 16),
                                     Expanded(
-                                      child: Text(
-                                        ws.description,
-                                        style: AppTextStyles.bodyMedium(secondaryTextColor),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                      child: Text(ws.description, style: AppTextStyles.bodyMedium(secondaryTextColor), maxLines: 2, overflow: TextOverflow.ellipsis),
                                     ),
                                     const Divider(),
                                     const SizedBox(height: 8),
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          'Member-owned',
-                                          style: AppTextStyles.caption(AppColors.accent),
-                                        ),
-                                        Icon(
-                                          Icons.arrow_forward_ios_rounded,
-                                          size: 14,
-                                          color: textThemeColor.withOpacity(0.4),
-                                        ),
+                                        Text('Member-owned', style: AppTextStyles.caption(AppColors.accent)),
+                                        Icon(Icons.arrow_forward_ios_rounded, size: 14, color: textThemeColor.withOpacity(0.4)),
                                       ],
                                     ),
                                   ],
@@ -239,17 +276,15 @@ class DashboardScreen extends ConsumerWidget {
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, _) => Center(
-                  child: Text('Error loading workspaces: $err'),
-                ),
+                error: (err, _) => Center(child: Text('Error loading workspaces: $err')),
               ),
             ),
           ],
         ),
       ),
       floatingActionButton: workspacesAsync.maybeWhen(
-        data: (list) => list.isEmpty 
-            ? null 
+        data: (list) => list.isEmpty
+            ? null
             : FloatingActionButton.extended(
                 onPressed: () => _showCreateWorkspaceDialog(context, ref),
                 icon: const Icon(Icons.add),
